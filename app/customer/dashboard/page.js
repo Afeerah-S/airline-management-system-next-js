@@ -13,7 +13,8 @@ export default function CustomerDashboard() {
   const [userId, setUserId] = useState(null);
   const [customerName, setCustomerName] = useState('');
 
-  const [searchForm, setSearchForm] = useState({ flightCode: '', departure: '', destination: '' });
+  const [searchMode, setSearchMode] = useState('code');
+  const [searchForm, setSearchForm] = useState({ flightCode: '', departure: '', destination: '' }); 
   const [bookForm, setBookForm] = useState({ flightCode: '', seatClass: 'Economy', seatNumber: '' });
   const [cancelId, setCancelId] = useState('');
   const [payForm, setPayForm] = useState({ bookingId: '', amount: '', method: 'Credit Card' });
@@ -101,6 +102,7 @@ export default function CustomerDashboard() {
   };
 
   const tabs = ['search', 'book', 'bookings', 'payments'];
+  const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#B97D7B', display: 'block', marginBottom: '6px' };
 
   return (
     <main style={styles.container}>
@@ -120,47 +122,78 @@ export default function CustomerDashboard() {
       </div>
 
       {tab === 'search' && (
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Search Flights</h2>
-          <div style={styles.grid}>
-            <input style={styles.input} placeholder="Flight Code" value={searchForm.flightCode}
-              onChange={e => setSearchForm({ ...searchForm, flightCode: e.target.value })} />
-            <input style={styles.input} placeholder="From (airport code)" value={searchForm.departure}
-              onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })} />
-            <input style={styles.input} placeholder="To (airport code)" value={searchForm.destination}
-              onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })} />
-          </div>
-          <button style={styles.primaryBtn} onClick={searchFlights}>Search</button>
-          {flights.length === 0 ? (
-            <p style={{ color: '#B0A89A', marginTop: '16px' }}>No flights found. Try searching above.</p>
-          ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>{['Code', 'From', 'To', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {flights.map(f => (
-                    <tr key={f.id}>
-                      <td style={styles.td}>{f.flightCode}</td>
-                      <td style={styles.td}>{f.departure}</td>
-                      <td style={styles.td}>{f.destination}</td>
-                      <td style={styles.td}>{f.departure_time ? new Date(f.departure_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>{f.arrival_time ? new Date(f.arrival_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.badge, background: f.status === 'On Time' ? '#22c55e' : f.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
-                          {f.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+  <div style={styles.section}>
+    <h2 style={styles.sectionTitle}>Search Flights</h2>
 
+    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <button
+        style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
+        onClick={() => { setSearchMode('code'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
+        🔍 Search by Flight Code
+      </button>
+      <button
+        style={{ ...styles.secondaryBtn, opacity: searchMode === 'route' ? 1 : 0.5 }}
+        onClick={() => { setSearchMode('route'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
+        🗺️ Search by Route
+      </button>
+    </div>
+
+    {searchMode === 'code' && (
+      <div style={styles.grid}>
+        <div>
+          <label style={labelStyle}>Flight Code</label>
+          <input style={styles.input} placeholder="e.g. PK101" value={searchForm.flightCode}
+            onChange={e => setSearchForm({ ...searchForm, flightCode: e.target.value })} />
+        </div>
+      </div>
+    )}
+
+    {searchMode === 'route' && (
+      <div style={styles.grid}>
+        <div>
+          <label style={labelStyle}>From (airport code)</label>
+          <input style={styles.input} placeholder="e.g. KHI" value={searchForm.departure}
+            onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })} />
+        </div>
+        <div>
+          <label style={labelStyle}>To (airport code)</label>
+          <input style={styles.input} placeholder="e.g. LHE" value={searchForm.destination}
+            onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })} />
+        </div>
+      </div>
+    )}
+
+    <button style={{ ...styles.primaryBtn, marginTop: '4px' }} onClick={searchFlights}>Search</button>
+
+    {flights.length === 0 ? (
+      <p style={{ color: '#B0A89A', marginTop: '16px' }}>No flights found. Try searching above.</p>
+    ) : (
+      <div style={styles.tableWrapper}>
+        <table style={styles.table}>
+          <thead>
+            <tr>{['Code', 'From', 'To', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {flights.map(f => (
+              <tr key={f.id}>
+                <td style={styles.td}>{f.flightCode}</td>
+                <td style={styles.td}>{f.departure}</td>
+                <td style={styles.td}>{f.destination}</td>
+                <td style={styles.td}>{f.departure_time ? new Date(f.departure_time).toLocaleString() : '-'}</td>
+                <td style={styles.td}>{f.arrival_time ? new Date(f.arrival_time).toLocaleString() : '-'}</td>
+                <td style={styles.td}>
+                  <span style={{ ...styles.badge, background: f.status === 'On Time' ? '#22c55e' : f.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
+                    {f.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+)}
       {tab === 'book' && (
   <div style={styles.section}>
     <h2 style={styles.sectionTitle}>Book a Flight</h2>

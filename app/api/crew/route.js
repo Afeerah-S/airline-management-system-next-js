@@ -54,28 +54,37 @@ export async function POST(request) {
 }
 
 export async function PATCH(request) {
-  const { crew_id, flight_id } = await request.json();
+  try {
+    const { crew_id, flight_id } = await request.json();
 
-  // Prevent duplicate assignment
-  const [existing] = await db.query(
-    'SELECT id FROM flight_crew WHERE crew_id = ? AND flight_id = ?',
-    [crew_id, flight_id]
-  );
+    const crewId = parseInt(crew_id);
+    const flightId = parseInt(flight_id);
 
-  if (existing.length > 0) {
-    return Response.json({ error: 'Crew member already assigned to this flight' }, { status: 400 });
+    if (!crewId || !flightId) {
+      return Response.json({ error: 'Invalid crew or flight ID' }, { status: 400 });
+    }
+
+    const [existing] = await db.query(
+      'SELECT id FROM flight_crew WHERE crew_id = ? AND flight_id = ?',
+      [crewId, flightId]
+    );
+
+    if (existing.length > 0) {
+      return Response.json({ error: 'Crew member already assigned to this flight' }, { status: 400 });
+    }
+
+    await db.query(
+      'INSERT INTO flight_crew (flight_id, crew_id) VALUES (?, ?)',
+      [flightId, crewId]
+    );
+
+    await db.query(
+      'UPDATE crew SET status = ? WHERE id = ?',
+      ['On Duty', crewId]
+    );
+
+    return Response.json({ success: true });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
   }
-
-  await db.query(
-    'INSERT INTO flight_crew (flight_id, crew_id) VALUES (?, ?)',
-    [flight_id, crew_id]
-  );
-
-  // Update crew status to On Duty
-  await db.query(
-    'UPDATE crew SET status = ? WHERE id = ?',
-    ['On Duty', crew_id]
-  );
-
-  return Response.json({ success: true });
 }

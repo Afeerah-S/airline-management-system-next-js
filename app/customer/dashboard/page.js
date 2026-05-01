@@ -9,12 +9,13 @@ export default function CustomerDashboard() {
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
   const [seats, setSeats] = useState([]);
+  const [airports, setAirports] = useState([]);
   const [msg, setMsg] = useState('');
   const [userId, setUserId] = useState(null);
   const [customerName, setCustomerName] = useState('');
 
   const [searchMode, setSearchMode] = useState('code');
-  const [searchForm, setSearchForm] = useState({ flightCode: '', departure: '', destination: '' }); 
+  const [searchForm, setSearchForm] = useState({ flightCode: '', departure: '', destination: '' });
   const [bookForm, setBookForm] = useState({ flightCode: '', seatClass: 'Economy', seatNumber: '' });
   const [cancelId, setCancelId] = useState('');
   const [payForm, setPayForm] = useState({ bookingId: '', amount: '', method: 'Credit Card' });
@@ -27,6 +28,7 @@ export default function CustomerDashboard() {
     setCustomerName(name);
     fetchBookings(id);
     fetchPayments(id);
+    fetchAirports();
   }, []);
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
@@ -37,6 +39,10 @@ export default function CustomerDashboard() {
 
   const fetchPayments = async (id) => {
     try { const res = await fetch(`/api/payments?userId=${id}`); const data = await res.json(); setPayments(Array.isArray(data) ? data : []); } catch { setPayments([]); }
+  };
+
+  const fetchAirports = async () => {
+    try { const res = await fetch('/api/airports'); const data = await res.json(); setAirports(Array.isArray(data) ? data : []); } catch { setAirports([]); }
   };
 
   const searchFlights = async () => {
@@ -122,121 +128,132 @@ export default function CustomerDashboard() {
       </div>
 
       {tab === 'search' && (
-  <div style={styles.section}>
-    <h2 style={styles.sectionTitle}>Search Flights</h2>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Search Flights</h2>
 
-    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-      <button
-        style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
-        onClick={() => { setSearchMode('code'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
-        🔍 Search by Flight Code
-      </button>
-      <button
-        style={{ ...styles.secondaryBtn, opacity: searchMode === 'route' ? 1 : 0.5 }}
-        onClick={() => { setSearchMode('route'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
-        🗺️ Search by Route
-      </button>
-    </div>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <button
+              style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
+              onClick={() => { setSearchMode('code'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
+              🔍 Search by Flight Code
+            </button>
+            <button
+              style={{ ...styles.secondaryBtn, opacity: searchMode === 'route' ? 1 : 0.5 }}
+              onClick={() => { setSearchMode('route'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
+              🗺️ Search by Route
+            </button>
+          </div>
 
-    {searchMode === 'code' && (
-      <div style={styles.grid}>
-        <div>
-          <label style={labelStyle}>Flight Code</label>
-          <input style={styles.input} placeholder="e.g. PK101" value={searchForm.flightCode}
-            onChange={e => setSearchForm({ ...searchForm, flightCode: e.target.value })} />
+          {searchMode === 'code' && (
+            <div style={styles.grid}>
+              <div>
+                <label style={labelStyle}>Flight Code</label>
+                <input style={styles.input} placeholder="e.g. PK101" value={searchForm.flightCode}
+                  onChange={e => setSearchForm({ ...searchForm, flightCode: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          {searchMode === 'route' && (
+            <div style={styles.grid}>
+              <div>
+                <label style={labelStyle}>From</label>
+                <select style={styles.input} value={searchForm.departure}
+                  onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })}>
+                  <option value="">Select departure airport</option>
+                  {airports.map(a => (
+                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>To</label>
+                <select style={styles.input} value={searchForm.destination}
+                  onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })}>
+                  <option value="">Select destination airport</option>
+                  {airports.filter(a => a.code !== searchForm.departure).map(a => (
+                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <button style={{ ...styles.primaryBtn, marginTop: '4px' }} onClick={searchFlights}>Search</button>
+
+          {flights.length === 0 ? (
+            <p style={{ color: '#B0A89A', marginTop: '16px' }}>No flights found. Try searching above.</p>
+          ) : (
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>{['Code', 'From', 'To', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {flights.map(f => (
+                    <tr key={f.id}>
+                      <td style={styles.td}>{f.flightCode}</td>
+                      <td style={styles.td}>{f.departure}</td>
+                      <td style={styles.td}>{f.destination}</td>
+                      <td style={styles.td}>{f.departure_time ? new Date(f.departure_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{f.arrival_time ? new Date(f.arrival_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.badge, background: f.status === 'On Time' ? '#22c55e' : f.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
+                          {f.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
-    )}
+      )}
 
-    {searchMode === 'route' && (
-      <div style={styles.grid}>
-        <div>
-          <label style={labelStyle}>From (airport code)</label>
-          <input style={styles.input} placeholder="e.g. KHI" value={searchForm.departure}
-            onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })} />
-        </div>
-        <div>
-          <label style={labelStyle}>To (airport code)</label>
-          <input style={styles.input} placeholder="e.g. LHE" value={searchForm.destination}
-            onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })} />
-        </div>
-      </div>
-    )}
-
-    <button style={{ ...styles.primaryBtn, marginTop: '4px' }} onClick={searchFlights}>Search</button>
-
-    {flights.length === 0 ? (
-      <p style={{ color: '#B0A89A', marginTop: '16px' }}>No flights found. Try searching above.</p>
-    ) : (
-      <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead>
-            <tr>{['Code', 'From', 'To', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {flights.map(f => (
-              <tr key={f.id}>
-                <td style={styles.td}>{f.flightCode}</td>
-                <td style={styles.td}>{f.departure}</td>
-                <td style={styles.td}>{f.destination}</td>
-                <td style={styles.td}>{f.departure_time ? new Date(f.departure_time).toLocaleString() : '-'}</td>
-                <td style={styles.td}>{f.arrival_time ? new Date(f.arrival_time).toLocaleString() : '-'}</td>
-                <td style={styles.td}>
-                  <span style={{ ...styles.badge, background: f.status === 'On Time' ? '#22c55e' : f.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
-                    {f.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
-)}
       {tab === 'book' && (
-  <div style={styles.section}>
-    <h2 style={styles.sectionTitle}>Book a Flight</h2>
-    <div style={styles.grid}>
-      <div>
-        <label style={{ fontSize: '13px', fontWeight: '600', color: '#B97D7B', display: 'block', marginBottom: '6px' }}>Flight Code</label>
-        <input style={styles.input} placeholder="e.g. ABC123" value={bookForm.flightCode}
-          onChange={e => { setBookForm({ ...bookForm, flightCode: e.target.value }); setSeats([]); }} />
-      </div>
-      <div>
-        <label style={{ fontSize: '13px', fontWeight: '600', color: '#B97D7B', display: 'block', marginBottom: '6px' }}>Seat Class</label>
-        <select style={styles.input} value={bookForm.seatClass}
-          onChange={e => { setBookForm({ ...bookForm, seatClass: e.target.value }); setSeats([]); }}>
-          <option>Economy</option>
-          <option>Business</option>
-          <option>First Class</option>
-        </select>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-        <button style={styles.secondaryBtn} onClick={fetchSeats}>Load Seats</button>
-      </div>
-    </div>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Book a Flight</h2>
+          <div style={styles.grid}>
+            <div>
+              <label style={labelStyle}>Flight Code</label>
+              <input style={styles.input} placeholder="e.g. PK101" value={bookForm.flightCode}
+                onChange={e => { setBookForm({ ...bookForm, flightCode: e.target.value }); setSeats([]); }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Seat Class</label>
+              <select style={styles.input} value={bookForm.seatClass}
+                onChange={e => { setBookForm({ ...bookForm, seatClass: e.target.value }); setSeats([]); }}>
+                <option>Economy</option>
+                <option>Business</option>
+                <option>First Class</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button style={styles.secondaryBtn} onClick={fetchSeats}>Load Seats</button>
+            </div>
+          </div>
 
-    {seats.length > 0 && (
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '13px', fontWeight: '600', color: '#B97D7B', display: 'block', marginBottom: '6px' }}>Select Seat</label>
-        <select style={{ ...styles.input, maxWidth: '250px' }} value={bookForm.seatNumber}
-          onChange={e => setBookForm({ ...bookForm, seatNumber: e.target.value })}>
-          <option value="">-- Choose a seat --</option>
-          {seats.map(s => <option key={s.id} value={s.seat_number}>{s.seat_number} ({s.class})</option>)}
-        </select>
-      </div>
-    )}
+          {seats.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={labelStyle}>Select Seat</label>
+              <select style={{ ...styles.input, maxWidth: '250px' }} value={bookForm.seatNumber}
+                onChange={e => setBookForm({ ...bookForm, seatNumber: e.target.value })}>
+                <option value="">-- Choose a seat --</option>
+                {seats.map(s => <option key={s.id} value={s.seat_number}>{s.seat_number} ({s.class})</option>)}
+              </select>
+            </div>
+          )}
 
-    {seats.length === 0 && (
-      <p style={{ color: '#B0A89A', marginBottom: '16px', fontSize: '14px' }}>
-        Enter a flight code, select a class, then click Load Seats.
-      </p>
-    )}
+          {seats.length === 0 && (
+            <p style={{ color: '#B0A89A', marginBottom: '16px', fontSize: '14px' }}>
+              Enter a flight code, select a class, then click Load Seats.
+            </p>
+          )}
 
-    <button style={styles.primaryBtn} onClick={bookFlight}>Book Flight</button>
-  </div>
-)}
+          <button style={styles.primaryBtn} onClick={bookFlight}>Book Flight</button>
+        </div>
+      )}
 
       {tab === 'bookings' && (
         <div style={styles.section}>

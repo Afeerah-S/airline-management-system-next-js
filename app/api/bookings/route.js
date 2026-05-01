@@ -47,8 +47,6 @@ export async function POST(request) {
      flight[0].departure_time, flight[0].arrival_time, seatId]
   );
 
-  await db.query('UPDATE seats SET is_booked = 1 WHERE id = ?', [seatId]);
-
   return Response.json({ success: true, bookingId: booking.insertId });
 }
 
@@ -64,7 +62,6 @@ export async function DELETE(request) {
   if (booking.length === 0) return Response.json({ error: 'Booking not found' }, { status: 404 });
 
   await db.query('DELETE FROM bookings WHERE id = ? AND user_id = ?', [bookingId, userId]);
-  await db.query('UPDATE seats SET is_booked = 0 WHERE id = ?', [booking[0].seat_id]);
 
   return Response.json({ success: true });
 }

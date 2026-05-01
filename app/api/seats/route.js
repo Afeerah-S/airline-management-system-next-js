@@ -21,8 +21,9 @@ export async function GET(request) {
 
     const flightId = flight[0].id;
     let query = `
-      SELECT * FROM seats 
-      WHERE flight_id = ? AND is_booked = 0
+      SELECT * FROM seats s
+      WHERE s.flight_id = ? 
+      AND s.id NOT IN (SELECT seat_id FROM bookings)
     `;
     const params = [flightId];
 

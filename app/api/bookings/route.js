@@ -32,7 +32,7 @@ export async function POST(request) {
   const flightId = flight[0].id;
 
   const [seat] = await db.query(
-    'SELECT id FROM seats WHERE flight_id = ? AND seat_number = ? AND class = ? AND is_booked = 0',
+    'SELECT id FROM seats WHERE flight_id = ? AND seat_number = ? AND class = ? AND id NOT IN (SELECT seat_id FROM bookings)',
     [flightId, seatNumber, seatClass]
   );
 

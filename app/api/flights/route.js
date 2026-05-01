@@ -48,7 +48,7 @@ export async function POST(request) {
 
     for (const seat of seats) {
       await db.query(
-        'INSERT INTO seats (flight_id, seat_number, class, is_booked) VALUES (?, ?, ?, ?)',
+        'INSERT INTO seats (flight_id, seat_number, class) VALUES (?, ?, ?)',
         seat
       );
     }

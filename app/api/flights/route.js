@@ -65,9 +65,12 @@ export async function PATCH(request) {
     const { flightCode, status, departure_time, arrival_time } = await request.json();
 
     await db.query(
-      'UPDATE flights SET status = ?, departure_time = ?, arrival_time = ? WHERE flightCode = ?',
-      [status, departure_time, arrival_time, flightCode]
-    );
+      `UPDATE flights SET status = ?
+      ${departure_time ? ', departure_time = ?' : ''}
+      ${arrival_time ? ', arrival_time = ?' : ''}
+      WHERE flightCode = ?`,
+      [status, ...(departure_time ? [departure_time] : []), ...(arrival_time ? [arrival_time] : []), flightCode]
+);
 
     return Response.json({ success: true });
   } catch (err) {

@@ -3,7 +3,7 @@ import db from '@/lib/db';
 // Admin Login
 export async function POST(request) {
   const { admin_id, password } = await request.json();
-
+  
   const [rows] = await db.query(
     'SELECT * FROM admin WHERE admin_id = ? AND password = ?',
     [admin_id, password]

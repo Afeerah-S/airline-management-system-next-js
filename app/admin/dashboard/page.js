@@ -20,6 +20,7 @@ export default function AdminDashboard() {
   const [airportForm, setAirportForm] = useState({ code: '', name: '', city: '', country: '' });
   const [delayForm, setDelayForm] = useState({ flightCode: '', departure_time: '', arrival_time: '' });
   const [cancelCode, setCancelCode] = useState('');
+  const [assignForm, setAssignForm] = useState({ crew_id: '', flight_id: '' });
 
   useEffect(() => {
     fetchFlights(); fetchPilots(); fetchCrew(); fetchAirports();
@@ -92,6 +93,21 @@ export default function AdminDashboard() {
       fetchCrew();
     } catch (e) { notify('Error: ' + e.message); }
   };
+
+  const assignCrew = async () => {
+  try {
+    const res = await fetch('/api/crew', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assignForm)
+    });
+    const data = await res.json();
+    if (!res.ok) return notify('Error: ' + data.error);
+    notify('Crew member assigned to flight!');
+    setAssignForm({ crew_id: '', flight_id: '' });
+    await fetchCrew(); // <-- this line was missing
+  } catch (e) { notify('Error: ' + e.message); }
+};
 
   const addAirport = async () => {
     try {
@@ -248,6 +264,7 @@ export default function AdminDashboard() {
               onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })} />
           </div>
           <button style={styles.primaryBtn} onClick={addCrew}>Add Crew</button>
+
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Crew List</h2>
           {crew.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No crew members added yet.</p> : (
             <div style={styles.tableWrapper}>
@@ -265,6 +282,27 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
+
+          <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Assign Crew to Flight</h2>
+          <div style={styles.grid}>
+            <select style={styles.input} value={assignForm.crew_id}
+              onChange={e => setAssignForm({ ...assignForm, crew_id: e.target.value })}>
+              <option value="">Select Crew Member</option>
+              {crew.map(c => (
+                <option key={c.id} value={c.id}>{c.name} — {c.role}</option>
+              ))}
+            </select>
+            <select style={styles.input} value={assignForm.flight_id}
+              onChange={e => setAssignForm({ ...assignForm, flight_id: e.target.value })}>
+              <option value="">Select Flight</option>
+              {flights.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.flightCode} — {f.departure} → {f.destination}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button style={styles.primaryBtn} onClick={assignCrew}>Assign to Flight</button>
         </div>
       )}
 

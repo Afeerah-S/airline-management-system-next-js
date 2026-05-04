@@ -4,8 +4,12 @@ import db from '@/lib/db';
 export async function POST(request) {
   const { username, password } = await request.json();
 
+  if (!username || !password) {
+    return Response.json({ error: 'Username and password are required' }, { status: 400 });
+  }
+
   const [rows] = await db.query(
-    'SELECT id, username, email FROM customers WHERE LOWER(username) = LOWER(?) AND password = ?',
+    'SELECT id, username, email FROM customers WHERE LOWER(username) = LOWER(?) AND BINARY password = ?',
     [username, password]
   );
 
@@ -19,6 +23,22 @@ export async function POST(request) {
 // Customer Signup
 export async function PUT(request) {
   const { username, password, email } = await request.json();
+
+  if (!username || !password || !email) {
+    return Response.json({ error: 'Username, password, and email are all required' }, { status: 400 });
+  }
+
+  if (username.length < 3) {
+    return Response.json({ error: 'Username must be at least 3 characters' }, { status: 400 });
+  }
+
+  if (password.length < 6) {
+    return Response.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+  }
+
+  if (!email.includes('@')) {
+    return Response.json({ error: 'Please enter a valid email address' }, { status: 400 });
+  }
 
   const [existing] = await db.query(
     'SELECT id FROM customers WHERE LOWER(username) = LOWER(?)',

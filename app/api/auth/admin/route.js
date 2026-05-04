@@ -3,9 +3,13 @@ import db from '@/lib/db';
 // Admin Login
 export async function POST(request) {
   const { admin_id, password } = await request.json();
-  
+
+  if (!admin_id || !password) {
+    return Response.json({ error: 'Admin ID and password are required' }, { status: 400 });
+  }
+
   const [rows] = await db.query(
-    'SELECT * FROM admin WHERE admin_id = ? AND password = ?',
+    'SELECT * FROM admin WHERE admin_id = ? AND BINARY password = ?',
     [admin_id, password]
   );
 
@@ -19,6 +23,18 @@ export async function POST(request) {
 // Admin Signup
 export async function PUT(request) {
   const { admin_id, password, email } = await request.json();
+
+  if (!admin_id || !password || !email) {
+    return Response.json({ error: 'Admin ID, password, and email are all required' }, { status: 400 });
+  }
+
+  if (password.length < 6) {
+    return Response.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+  }
+
+  if (!email.includes('@')) {
+    return Response.json({ error: 'Please enter a valid email address' }, { status: 400 });
+  }
 
   const [existing] = await db.query(
     'SELECT admin_id FROM admin WHERE admin_id = ?', [admin_id]

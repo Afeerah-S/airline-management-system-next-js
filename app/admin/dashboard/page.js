@@ -11,6 +11,11 @@ export default function AdminDashboard() {
   const [airports, setAirports] = useState([]);
   const [msg, setMsg] = useState('');
 
+  // Flight bookings lookup
+  const [bookingFlightCode, setBookingFlightCode] = useState('');
+  const [flightBookings, setFlightBookings] = useState([]);
+  const [bookingsLoaded, setBookingsLoaded] = useState(false);
+
   const [flightForm, setFlightForm] = useState({
     flightCode: '', departure: '', destination: '',
     departure_time: '', arrival_time: '', pilot_id: ''
@@ -20,9 +25,10 @@ export default function AdminDashboard() {
   const [airportForm, setAirportForm] = useState({ code: '', name: '', city: '', country: '' });
   const [delayForm, setDelayForm] = useState({ flightCode: '', departure_time: '', arrival_time: '' });
   const [cancelCode, setCancelCode] = useState('');
-  const [assignForm, setAssignForm] = useState({ crew_id: '', flight_id: '' });
 
   useEffect(() => {
+    const admin = localStorage.getItem('adminId');
+    if (!admin) router.push('/admin/login');
     fetchFlights(); fetchPilots(); fetchCrew(); fetchAirports();
   }, []);
 
@@ -37,6 +43,16 @@ export default function AdminDashboard() {
   };
   const fetchAirports = async () => {
     try { const res = await fetch('/api/airports'); const data = await res.json(); setAirports(Array.isArray(data) ? data : []); } catch { setAirports([]); }
+  };
+
+  const fetchFlightBookings = async () => {
+    if (!bookingFlightCode.trim()) return notify('Please enter a flight code');
+    try {
+      const res = await fetch(`/api/bookings?flightCode=${bookingFlightCode.trim()}`);
+      const data = await res.json();
+      setFlightBookings(Array.isArray(data) ? data : []);
+      setBookingsLoaded(true);
+    } catch { setFlightBookings([]); setBookingsLoaded(true); }
   };
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
@@ -94,21 +110,6 @@ export default function AdminDashboard() {
     } catch (e) { notify('Error: ' + e.message); }
   };
 
-  const assignCrew = async () => {
-  try {
-    const res = await fetch('/api/crew', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(assignForm)
-    });
-    const data = await res.json();
-    if (!res.ok) return notify('Error: ' + data.error);
-    notify('Crew member assigned to flight!');
-    setAssignForm({ crew_id: '', flight_id: '' });
-    await fetchCrew(); // <-- this line was missing
-  } catch (e) { notify('Error: ' + e.message); }
-};
-
   const addAirport = async () => {
     try {
       const res = await fetch('/api/airports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(airportForm) });
@@ -120,7 +121,7 @@ export default function AdminDashboard() {
     } catch (e) { notify('Error: ' + e.message); }
   };
 
-  const tabs = ['flights', 'pilots', 'crew', 'airports'];
+  const tabs = ['flights', 'pilots', 'crew', 'airports', 'bookings'];
 
   return (
     <main style={styles.container}>
@@ -134,7 +135,7 @@ export default function AdminDashboard() {
       <div style={styles.tabs}>
         {tabs.map(t => (
           <button key={t} style={{ ...styles.tab, ...(tab === t ? styles.activeTab : {}) }} onClick={() => setTab(t)}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'bookings' ? '📋 Bookings' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -155,8 +156,11 @@ export default function AdminDashboard() {
               <option value="">Select Destination</option>
               {airports.map(a => <option key={a.id} value={a.code}>{a.code} — {a.city}</option>)}
             </select>
-            <input style={styles.input} placeholder="Pilot ID"
-              value={flightForm.pilot_id} onChange={e => setFlightForm({ ...flightForm, pilot_id: e.target.value })} />
+            <select style={styles.input} value={flightForm.pilot_id}
+              onChange={e => setFlightForm({ ...flightForm, pilot_id: e.target.value })}>
+              <option value="">Select Pilot</option>
+              {pilots.map(p => <option key={p.id} value={p.id}>{p.name} ({p.license_number})</option>)}
+            </select>
             <input style={styles.input} type="datetime-local" value={flightForm.departure_time}
               onChange={e => setFlightForm({ ...flightForm, departure_time: e.target.value })} />
             <input style={styles.input} type="datetime-local" value={flightForm.arrival_time}
@@ -229,14 +233,13 @@ export default function AdminDashboard() {
           {pilots.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No pilots added yet.</p> : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
-                <thead><tr>{['Name', 'License', 'Experience', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Name', 'License', 'Experience'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {pilots.map(p => (
                     <tr key={p.id}>
                       <td style={styles.td}>{p.name}</td>
                       <td style={styles.td}>{p.license_number}</td>
                       <td style={styles.td}>{p.experience_years} years</td>
-                      <td style={styles.td}>{p.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -260,49 +263,29 @@ export default function AdminDashboard() {
               <option>Engineer</option>
               <option>Ground Staff</option>
             </select>
-            <input style={styles.input} placeholder="Flight ID (optional)" value={crewForm.flight_id}
-              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })} />
+            <select style={styles.input} value={crewForm.flight_id}
+              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })}>
+              <option value="">Assign to Flight (optional)</option>
+              {flights.map(f => <option key={f.id} value={f.id}>{f.flightCode} — {f.departure} → {f.destination}</option>)}
+            </select>
           </div>
           <button style={styles.primaryBtn} onClick={addCrew}>Add Crew</button>
-
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Crew List</h2>
           {crew.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No crew members added yet.</p> : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
-                <thead><tr>{['Name', 'Role', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Name', 'Role'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {crew.map(c => (
                     <tr key={c.id}>
                       <td style={styles.td}>{c.name}</td>
                       <td style={styles.td}>{c.role}</td>
-                      <td style={styles.td}>{c.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-
-          <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Assign Crew to Flight</h2>
-          <div style={styles.grid}>
-            <select style={styles.input} value={assignForm.crew_id}
-              onChange={e => setAssignForm({ ...assignForm, crew_id: e.target.value })}>
-              <option value="">Select Crew Member</option>
-              {crew.map(c => (
-                <option key={c.id} value={c.id}>{c.name} — {c.role}</option>
-              ))}
-            </select>
-            <select style={styles.input} value={assignForm.flight_id}
-              onChange={e => setAssignForm({ ...assignForm, flight_id: e.target.value })}>
-              <option value="">Select Flight</option>
-              {flights.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.flightCode} — {f.departure} → {f.destination}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button style={styles.primaryBtn} onClick={assignCrew}>Assign to Flight</button>
         </div>
       )}
 
@@ -337,6 +320,60 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'bookings' && (
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>📋 View Bookings by Flight</h2>
+          <p style={{ color: '#897D7B', fontSize: '14px', marginBottom: '16px' }}>
+            Enter a flight code to see all customers who have booked that flight.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <input
+              style={{ ...styles.input, maxWidth: '220px' }}
+              placeholder="e.g. PK101"
+              value={bookingFlightCode}
+              onChange={e => { setBookingFlightCode(e.target.value); setBookingsLoaded(false); setFlightBookings([]); }}
+            />
+            <button style={styles.primaryBtn} onClick={fetchFlightBookings}>Search Bookings</button>
+          </div>
+
+          {bookingsLoaded && flightBookings.length === 0 && (
+            <p style={{ color: '#B0A89A', fontSize: '14px' }}>No bookings found for flight <strong>{bookingFlightCode}</strong>.</p>
+          )}
+
+          {flightBookings.length > 0 && (
+            <>
+              <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#F5F0EB', borderRadius: '10px', fontSize: '14px', color: '#575527', fontWeight: '600' }}>
+                ✈️ Flight {flightBookings[0].flightCode} — {flightBookings[0].departure} → {flightBookings[0].destination} &nbsp;|&nbsp; {flightBookings.length} booking(s)
+              </div>
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>{['Booking ID', 'Customer', 'Seat', 'Class', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {flightBookings.map(b => (
+                      <tr key={b.id}>
+                        <td style={styles.td}>#{b.id}</td>
+                        <td style={styles.td}>{b.username}</td>
+                        <td style={styles.td}>{b.seat_number}</td>
+                        <td style={styles.td}>{b.class}</td>
+                        <td style={styles.td}>{b.departure_time ? new Date(b.departure_time).toLocaleString() : '-'}</td>
+                        <td style={styles.td}>{b.arrival_time ? new Date(b.arrival_time).toLocaleString() : '-'}</td>
+                        <td style={styles.td}>
+                          <span style={{ ...styles.badge, background: b.status === 'On Time' ? '#22c55e' : b.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
+                            {b.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

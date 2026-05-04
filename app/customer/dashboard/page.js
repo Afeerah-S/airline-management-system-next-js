@@ -9,7 +9,6 @@ export default function CustomerDashboard() {
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
   const [seats, setSeats] = useState([]);
-  const [airports, setAirports] = useState([]);
   const [msg, setMsg] = useState('');
   const [userId, setUserId] = useState(null);
   const [customerName, setCustomerName] = useState('');
@@ -28,7 +27,6 @@ export default function CustomerDashboard() {
     setCustomerName(name);
     fetchBookings(id);
     fetchPayments(id);
-    fetchAirports();
   }, []);
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
@@ -39,10 +37,6 @@ export default function CustomerDashboard() {
 
   const fetchPayments = async (id) => {
     try { const res = await fetch(`/api/payments?userId=${id}`); const data = await res.json(); setPayments(Array.isArray(data) ? data : []); } catch { setPayments([]); }
-  };
-
-  const fetchAirports = async () => {
-    try { const res = await fetch('/api/airports'); const data = await res.json(); setAirports(Array.isArray(data) ? data : []); } catch { setAirports([]); }
   };
 
   const searchFlights = async () => {
@@ -130,15 +124,12 @@ export default function CustomerDashboard() {
       {tab === 'search' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Search Flights</h2>
-
           <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <button
-              style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
+            <button style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
               onClick={() => { setSearchMode('code'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
               🔍 Search by Flight Code
             </button>
-            <button
-              style={{ ...styles.secondaryBtn, opacity: searchMode === 'route' ? 1 : 0.5 }}
+            <button style={{ ...styles.secondaryBtn, opacity: searchMode === 'route' ? 1 : 0.5 }}
               onClick={() => { setSearchMode('route'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
               🗺️ Search by Route
             </button>
@@ -157,24 +148,14 @@ export default function CustomerDashboard() {
           {searchMode === 'route' && (
             <div style={styles.grid}>
               <div>
-                <label style={labelStyle}>From</label>
-                <select style={styles.input} value={searchForm.departure}
-                  onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })}>
-                  <option value="">Select departure airport</option>
-                  {airports.map(a => (
-                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
-                  ))}
-                </select>
+                <label style={labelStyle}>From (airport code)</label>
+                <input style={styles.input} placeholder="e.g. KHI" value={searchForm.departure}
+                  onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })} />
               </div>
               <div>
-                <label style={labelStyle}>To</label>
-                <select style={styles.input} value={searchForm.destination}
-                  onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })}>
-                  <option value="">Select destination airport</option>
-                  {airports.filter(a => a.code !== searchForm.departure).map(a => (
-                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
-                  ))}
-                </select>
+                <label style={labelStyle}>To (airport code)</label>
+                <input style={styles.input} placeholder="e.g. LHE" value={searchForm.destination}
+                  onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })} />
               </div>
             </div>
           )}
@@ -264,18 +245,19 @@ export default function CustomerDashboard() {
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
-                  <tr>{['Booking ID', 'Flight', 'From', 'To', 'Departure', 'Arrival', 'Seat', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                  <tr>{['Booking ID', 'Flight', 'From', 'To', 'Departure', 'Arrival', 'Seat', 'Class', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {bookings.map(b => (
                     <tr key={b.id}>
                       <td style={styles.td}>{b.id}</td>
                       <td style={styles.td}>{b.flightCode}</td>
-                      <td style={styles.td}>{b.depart}</td>
-                      <td style={styles.td}>{b.arrive}</td>
-                      <td style={styles.td}>{b.depart_time ? new Date(b.depart_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>{b.arrive_time ? new Date(b.arrive_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>{b.seat_number} ({b.class})</td>
+                      <td style={styles.td}>{b.departure}</td>
+                      <td style={styles.td}>{b.destination}</td>
+                      <td style={styles.td}>{b.departure_time ? new Date(b.departure_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{b.arrival_time ? new Date(b.arrival_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{b.seat_number}</td>
+                      <td style={styles.td}>{b.class}</td>
                       <td style={styles.td}>
                         <span style={{ ...styles.badge, background: b.status === 'On Time' ? '#22c55e' : b.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
                           {b.status}

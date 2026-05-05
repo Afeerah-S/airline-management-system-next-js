@@ -11,10 +11,11 @@ export default function AdminDashboard() {
   const [airports, setAirports] = useState([]);
   const [msg, setMsg] = useState('');
 
-  // Flight bookings lookup
+  // Bookings lookup
   const [bookingFlightCode, setBookingFlightCode] = useState('');
   const [flightBookings, setFlightBookings] = useState([]);
   const [bookingsLoaded, setBookingsLoaded] = useState(false);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
 
   const [flightForm, setFlightForm] = useState({
     flightCode: '', departure: '', destination: '',
@@ -27,8 +28,6 @@ export default function AdminDashboard() {
   const [cancelCode, setCancelCode] = useState('');
 
   useEffect(() => {
-    const admin = localStorage.getItem('adminId');
-    if (!admin) router.push('/admin/login');
     fetchFlights(); fetchPilots(); fetchCrew(); fetchAirports();
   }, []);
 
@@ -46,18 +45,34 @@ export default function AdminDashboard() {
   };
 
   const fetchFlightBookings = async () => {
-    if (!bookingFlightCode.trim()) return notify('Please enter a flight code');
+    if (!bookingFlightCode.trim()) return notify('Please enter a flight code to search');
+    setBookingsLoading(true);
+    setBookingsLoaded(false);
+    setFlightBookings([]);
     try {
-      const res = await fetch(`/api/bookings?flightCode=${bookingFlightCode.trim()}`);
+      const res = await fetch(`/api/bookings?flightCode=${bookingFlightCode.trim().toUpperCase()}`);
       const data = await res.json();
       setFlightBookings(Array.isArray(data) ? data : []);
       setBookingsLoaded(true);
-    } catch { setFlightBookings([]); setBookingsLoaded(true); }
+    } catch {
+      setFlightBookings([]);
+      setBookingsLoaded(true);
+    } finally {
+      setBookingsLoading(false);
+    }
   };
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
   const addFlight = async () => {
+    if (!flightForm.flightCode.trim()) return notify('Please enter a flight code');
+    if (!flightForm.departure) return notify('Please select a departure airport');
+    if (!flightForm.destination) return notify('Please select a destination airport');
+    if (flightForm.departure === flightForm.destination) return notify('Departure and destination cannot be the same');
+    if (!flightForm.pilot_id) return notify('Please enter a pilot ID');
+    if (!flightForm.departure_time) return notify('Please enter the departure time');
+    if (!flightForm.arrival_time) return notify('Please enter the arrival time');
+    if (flightForm.arrival_time <= flightForm.departure_time) return notify('Arrival time must be after departure time');
     try {
       const res = await fetch('/api/flights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flightForm) });
       const data = await res.json();
@@ -69,6 +84,9 @@ export default function AdminDashboard() {
   };
 
   const delayFlight = async () => {
+    if (!delayForm.flightCode.trim()) return notify('Please enter a flight code to delay');
+    if (!delayForm.departure_time) return notify('Please enter the new departure time');
+    if (!delayForm.arrival_time) return notify('Please enter the new arrival time');
     try {
       const res = await fetch('/api/flights', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...delayForm, status: 'Delayed' }) });
       if (!res.ok) return notify('Error delaying flight');
@@ -79,6 +97,7 @@ export default function AdminDashboard() {
   };
 
   const cancelFlight = async () => {
+    if (!cancelCode.trim()) return notify('Please enter a flight code to cancel');
     try {
       const res = await fetch('/api/flights', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flightCode: cancelCode, status: 'Cancelled', departure_time: null, arrival_time: null }) });
       if (!res.ok) return notify('Error cancelling flight');
@@ -89,6 +108,10 @@ export default function AdminDashboard() {
   };
 
   const addPilot = async () => {
+    if (!pilotForm.name.trim()) return notify('Please enter the pilot\'s full name');
+    if (!pilotForm.license_number.trim()) return notify('Please enter the license number');
+    if (!pilotForm.experience_years) return notify('Please enter years of experience');
+    if (isNaN(pilotForm.experience_years) || Number(pilotForm.experience_years) < 0) return notify('Experience years must be a valid positive number');
     try {
       const res = await fetch('/api/pilots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pilotForm) });
       const data = await res.json();
@@ -100,6 +123,8 @@ export default function AdminDashboard() {
   };
 
   const addCrew = async () => {
+    if (!crewForm.name.trim()) return notify('Please enter the crew member\'s full name');
+    if (!crewForm.role) return notify('Please select a role for the crew member');
     try {
       const res = await fetch('/api/crew', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(crewForm) });
       const data = await res.json();
@@ -111,6 +136,11 @@ export default function AdminDashboard() {
   };
 
   const addAirport = async () => {
+    if (!airportForm.code.trim()) return notify('Please enter the airport code');
+    if (airportForm.code.trim().length !== 3) return notify('Airport code must be exactly 3 letters (e.g. KHI)');
+    if (!airportForm.name.trim()) return notify('Please enter the airport name');
+    if (!airportForm.city.trim()) return notify('Please enter the city');
+    if (!airportForm.country.trim()) return notify('Please enter the country');
     try {
       const res = await fetch('/api/airports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(airportForm) });
       const data = await res.json();
@@ -156,11 +186,8 @@ export default function AdminDashboard() {
               <option value="">Select Destination</option>
               {airports.map(a => <option key={a.id} value={a.code}>{a.code} — {a.city}</option>)}
             </select>
-            <select style={styles.input} value={flightForm.pilot_id}
-              onChange={e => setFlightForm({ ...flightForm, pilot_id: e.target.value })}>
-              <option value="">Select Pilot</option>
-              {pilots.map(p => <option key={p.id} value={p.id}>{p.name} ({p.license_number})</option>)}
-            </select>
+            <input style={styles.input} placeholder="Pilot ID"
+              value={flightForm.pilot_id} onChange={e => setFlightForm({ ...flightForm, pilot_id: e.target.value })} />
             <input style={styles.input} type="datetime-local" value={flightForm.departure_time}
               onChange={e => setFlightForm({ ...flightForm, departure_time: e.target.value })} />
             <input style={styles.input} type="datetime-local" value={flightForm.arrival_time}
@@ -225,7 +252,7 @@ export default function AdminDashboard() {
               onChange={e => setPilotForm({ ...pilotForm, name: e.target.value })} />
             <input style={styles.input} placeholder="License Number" value={pilotForm.license_number}
               onChange={e => setPilotForm({ ...pilotForm, license_number: e.target.value })} />
-            <input style={styles.input} placeholder="Experience (years)" value={pilotForm.experience_years}
+            <input style={styles.input} placeholder="Experience (years)" type="number" min="0" value={pilotForm.experience_years}
               onChange={e => setPilotForm({ ...pilotForm, experience_years: e.target.value })} />
           </div>
           <button style={styles.primaryBtn} onClick={addPilot}>Add Pilot</button>
@@ -233,13 +260,14 @@ export default function AdminDashboard() {
           {pilots.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No pilots added yet.</p> : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
-                <thead><tr>{['Name', 'License', 'Experience'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Name', 'License', 'Experience', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {pilots.map(p => (
                     <tr key={p.id}>
                       <td style={styles.td}>{p.name}</td>
                       <td style={styles.td}>{p.license_number}</td>
                       <td style={styles.td}>{p.experience_years} years</td>
+                      <td style={styles.td}>{p.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -263,23 +291,21 @@ export default function AdminDashboard() {
               <option>Engineer</option>
               <option>Ground Staff</option>
             </select>
-            <select style={styles.input} value={crewForm.flight_id}
-              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })}>
-              <option value="">Assign to Flight (optional)</option>
-              {flights.map(f => <option key={f.id} value={f.id}>{f.flightCode} — {f.departure} → {f.destination}</option>)}
-            </select>
+            <input style={styles.input} placeholder="Flight ID (optional)" value={crewForm.flight_id}
+              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })} />
           </div>
           <button style={styles.primaryBtn} onClick={addCrew}>Add Crew</button>
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Crew List</h2>
           {crew.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No crew members added yet.</p> : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
-                <thead><tr>{['Name', 'Role'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Name', 'Role', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {crew.map(c => (
                     <tr key={c.id}>
                       <td style={styles.td}>{c.name}</td>
                       <td style={styles.td}>{c.role}</td>
+                      <td style={styles.td}>{c.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -327,53 +353,80 @@ export default function AdminDashboard() {
       {tab === 'bookings' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>📋 View Bookings by Flight</h2>
-          <p style={{ color: '#897D7B', fontSize: '14px', marginBottom: '16px' }}>
-            Enter a flight code to see all customers who have booked that flight.
+          <p style={{ color: '#897D7B', fontSize: '14px', marginBottom: '20px' }}>
+            Enter a flight code to see all passengers booked on that flight.
           </p>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap' }}>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '28px' }}>
             <input
               style={{ ...styles.input, maxWidth: '220px' }}
               placeholder="e.g. PK101"
               value={bookingFlightCode}
-              onChange={e => { setBookingFlightCode(e.target.value); setBookingsLoaded(false); setFlightBookings([]); }}
+              onChange={e => {
+                setBookingFlightCode(e.target.value);
+                setBookingsLoaded(false);
+                setFlightBookings([]);
+              }}
+              onKeyDown={e => e.key === 'Enter' && fetchFlightBookings()}
             />
-            <button style={styles.primaryBtn} onClick={fetchFlightBookings}>Search Bookings</button>
+            <button style={styles.primaryBtn} onClick={fetchFlightBookings}>
+              {bookingsLoading ? 'Searching...' : 'Search Bookings'}
+            </button>
           </div>
 
-          {bookingsLoaded && flightBookings.length === 0 && (
-            <p style={{ color: '#B0A89A', fontSize: '14px' }}>No bookings found for flight <strong>{bookingFlightCode}</strong>.</p>
+          {/* Summary bar */}
+          {bookingsLoaded && flightBookings.length > 0 && (
+            <div style={styles.summaryBar}>
+              <span>✈️ <strong>{flightBookings[0]?.flightCode}</strong></span>
+              <span>🛫 {flightBookings[0]?.departure} → {flightBookings[0]?.destination}</span>
+              <span>🕐 {flightBookings[0]?.departure_time ? new Date(flightBookings[0].departure_time).toLocaleString() : '-'}</span>
+              <span style={{ marginLeft: 'auto' }}>
+                <strong>{flightBookings.length}</strong> booking{flightBookings.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           )}
 
+          {/* No results */}
+          {bookingsLoaded && flightBookings.length === 0 && (
+            <div style={styles.emptyBox}>
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+              <p style={{ color: '#897D7B', fontWeight: '600' }}>No bookings found for flight <strong>{bookingFlightCode.toUpperCase()}</strong></p>
+              <p style={{ color: '#B0A89A', fontSize: '13px', marginTop: '4px' }}>Make sure the flight code is correct and the flight has bookings.</p>
+            </div>
+          )}
+
+          {/* Results table */}
           {flightBookings.length > 0 && (
-            <>
-              <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#F5F0EB', borderRadius: '10px', fontSize: '14px', color: '#575527', fontWeight: '600' }}>
-                ✈️ Flight {flightBookings[0].flightCode} — {flightBookings[0].departure} → {flightBookings[0].destination} &nbsp;|&nbsp; {flightBookings.length} booking(s)
-              </div>
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>{['Booking ID', 'Customer', 'Seat', 'Class', 'Departure', 'Arrival', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {flightBookings.map(b => (
-                      <tr key={b.id}>
-                        <td style={styles.td}>#{b.id}</td>
-                        <td style={styles.td}>{b.username}</td>
-                        <td style={styles.td}>{b.seat_number}</td>
-                        <td style={styles.td}>{b.class}</td>
-                        <td style={styles.td}>{b.departure_time ? new Date(b.departure_time).toLocaleString() : '-'}</td>
-                        <td style={styles.td}>{b.arrival_time ? new Date(b.arrival_time).toLocaleString() : '-'}</td>
-                        <td style={styles.td}>
-                          <span style={{ ...styles.badge, background: b.status === 'On Time' ? '#22c55e' : b.status === 'Delayed' ? '#f59e0b' : '#ef4444' }}>
-                            {b.status}
-                          </span>
-                        </td>
-                      </tr>
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {['Booking ID', 'Customer', 'Seat', 'Class', 'Booked At', 'Flight Status'].map(h => (
+                      <th key={h} style={styles.th}>{h}</th>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flightBookings.map((b, i) => (
+                    <tr key={b.id} style={{ background: i % 2 === 0 ? '#FDFAF9' : 'white' }}>
+                      <td style={styles.td}>#{b.id}</td>
+                      <td style={styles.td}>{b.username}</td>
+                      <td style={styles.td}>{b.seat_number}</td>
+                      <td style={styles.td}>{b.class}</td>
+                      <td style={styles.td}>{b.booked_at ? new Date(b.booked_at).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>
+                        <span style={{
+                          ...styles.badge,
+                          background: b.status === 'On Time' ? '#22c55e' : b.status === 'Delayed' ? '#f59e0b' : b.status === 'Cancelled' ? '#ef4444' : '#6b7280'
+                        }}>
+                          {b.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -436,4 +489,16 @@ const styles = {
   },
   td: { padding: '12px 14px', borderBottom: '1px solid #F0EBE3', fontSize: '14px', color: '#444' },
   badge: { padding: '4px 12px', borderRadius: '999px', color: 'white', fontSize: '12px', fontWeight: '600' },
+  summaryBar: {
+    display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap',
+    background: '#F5F0EB', border: '1px solid #DDD3C9',
+    borderRadius: '12px', padding: '14px 20px',
+    fontSize: '14px', color: '#575527', fontWeight: '600',
+    marginBottom: '16px',
+  },
+  emptyBox: {
+    textAlign: 'center', padding: '48px 20px',
+    background: '#FDFAF9', border: '1px dashed #DDD3C9',
+    borderRadius: '12px',
+  },
 };

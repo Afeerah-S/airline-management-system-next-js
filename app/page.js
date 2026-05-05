@@ -50,9 +50,6 @@ export default function Home() {
           <button style={styles.heroPrimaryBtn} onClick={() => router.push('/customer/login')}>
             🧳 Book a Flight
           </button>
-          <button style={styles.heroSecondaryBtn} onClick={() => router.push('/admin/login')}>
-            🛠️ Admin Portal
-          </button>
         </div>
 
         {/* Stats */}

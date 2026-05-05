@@ -28,6 +28,12 @@ export async function PUT(request) {
     return Response.json({ error: 'Admin ID, password, and email are all required' }, { status: 400 });
   }
 
+  // Admin ID must be ADM followed by exactly 3 digits e.g. ADM001
+  const adminIdPattern = /^ADM\d{3}$/;
+  if (!adminIdPattern.test(admin_id)) {
+    return Response.json({ error: 'Admin ID must be in the format ADM followed by 3 digits (e.g. ADM001)' }, { status: 400 });
+  }
+
   if (password.length < 6) {
     return Response.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
   }

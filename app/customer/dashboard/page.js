@@ -9,6 +9,7 @@ export default function CustomerDashboard() {
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
   const [seats, setSeats] = useState([]);
+  const [airports, setAirports] = useState([]);
   const [msg, setMsg] = useState('');
   const [userId, setUserId] = useState(null);
   const [customerName, setCustomerName] = useState('');
@@ -27,6 +28,7 @@ export default function CustomerDashboard() {
     setCustomerName(name);
     fetchBookings(id);
     fetchPayments(id);
+    fetchAirports();
   }, []);
 
   const notify = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
@@ -39,25 +41,45 @@ export default function CustomerDashboard() {
     try { const res = await fetch(`/api/payments?userId=${id}`); const data = await res.json(); setPayments(Array.isArray(data) ? data : []); } catch { setPayments([]); }
   };
 
+  const fetchAirports = async () => {
+    try { const res = await fetch('/api/airports'); const data = await res.json(); setAirports(Array.isArray(data) ? data : []); } catch { setAirports([]); }
+  };
+
   const searchFlights = async () => {
+    if (searchMode === 'code' && !searchForm.flightCode.trim()) {
+      return notify('Please enter a flight code.');
+    }
+    if (searchMode === 'route' && !searchForm.departure) {
+      return notify('Please select a departure airport.');
+    }
+    if (searchMode === 'route' && !searchForm.destination) {
+      return notify('Please select a destination airport.');
+    }
+    if (searchMode === 'route' && searchForm.departure === searchForm.destination) {
+      return notify('Departure and destination cannot be the same.');
+    }
     try {
       const params = new URLSearchParams(searchForm).toString();
       const res = await fetch(`/api/flights?${params}`);
       const data = await res.json();
       setFlights(Array.isArray(data) ? data : []);
-    } catch { setFlights([]); }
+      if (Array.isArray(data) && data.length === 0) notify('No flights found for your search.');
+    } catch { setFlights([]); notify('Error fetching flights.'); }
   };
 
   const fetchSeats = async () => {
-    if (!bookForm.flightCode || !bookForm.seatClass) return;
+    if (!bookForm.flightCode.trim()) return notify('Please enter a flight code.');
     try {
       const res = await fetch(`/api/seats?flightCode=${bookForm.flightCode}&class=${bookForm.seatClass}`);
       const data = await res.json();
       setSeats(Array.isArray(data) ? data : []);
-    } catch { setSeats([]); }
+      if (Array.isArray(data) && data.length === 0) notify('No available seats for this flight and class.');
+    } catch { setSeats([]); notify('Error loading seats.'); }
   };
 
   const bookFlight = async () => {
+    if (!bookForm.flightCode.trim()) return notify('Please enter a flight code.');
+    if (!bookForm.seatNumber) return notify('Please select a seat.');
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -74,13 +96,14 @@ export default function CustomerDashboard() {
   };
 
   const cancelBooking = async () => {
+    if (!cancelId.trim()) return notify('Please enter a booking ID.');
     try {
       const res = await fetch('/api/bookings', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: cancelId, userId }),
       });
-      if (!res.ok) return notify('Error cancelling booking');
+      if (!res.ok) return notify('Booking not found or does not belong to you.');
       notify('Booking cancelled!');
       setCancelId('');
       fetchBookings(userId);
@@ -88,13 +111,15 @@ export default function CustomerDashboard() {
   };
 
   const makePayment = async () => {
+    if (!payForm.bookingId.trim()) return notify('Please enter a booking ID.');
+    if (!payForm.amount.trim() || isNaN(payForm.amount) || Number(payForm.amount) <= 0) return notify('Please enter a valid amount.');
     try {
       const res = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payForm),
       });
-      if (!res.ok) return notify('Payment failed');
+      if (!res.ok) return notify('Payment failed. Check your booking ID.');
       notify('Payment successful!');
       setPayForm({ bookingId: '', amount: '', method: 'Credit Card' });
       fetchPayments(userId);
@@ -124,7 +149,7 @@ export default function CustomerDashboard() {
       {tab === 'search' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Search Flights</h2>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <button style={{ ...styles.secondaryBtn, opacity: searchMode === 'code' ? 1 : 0.5 }}
               onClick={() => { setSearchMode('code'); setFlights([]); setSearchForm({ flightCode: '', departure: '', destination: '' }); }}>
               🔍 Search by Flight Code
@@ -148,23 +173,31 @@ export default function CustomerDashboard() {
           {searchMode === 'route' && (
             <div style={styles.grid}>
               <div>
-                <label style={labelStyle}>From (airport code)</label>
-                <input style={styles.input} placeholder="e.g. KHI" value={searchForm.departure}
-                  onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })} />
+                <label style={labelStyle}>From</label>
+                <select style={styles.input} value={searchForm.departure}
+                  onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })}>
+                  <option value="">-- Select departure --</option>
+                  {airports.map(a => (
+                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label style={labelStyle}>To (airport code)</label>
-                <input style={styles.input} placeholder="e.g. LHE" value={searchForm.destination}
-                  onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })} />
+                <label style={labelStyle}>To</label>
+                <select style={styles.input} value={searchForm.destination}
+                  onChange={e => setSearchForm({ ...searchForm, destination: e.target.value })}>
+                  <option value="">-- Select destination --</option>
+                  {airports.filter(a => a.code !== searchForm.departure).map(a => (
+                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
+                  ))}
+                </select>
               </div>
             </div>
           )}
 
           <button style={{ ...styles.primaryBtn, marginTop: '4px' }} onClick={searchFlights}>Search</button>
 
-          {flights.length === 0 ? (
-            <p style={{ color: '#B0A89A', marginTop: '16px' }}>No flights found. Try searching above.</p>
-          ) : (
+          {flights.length > 0 && (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
@@ -252,10 +285,10 @@ export default function CustomerDashboard() {
                     <tr key={b.id}>
                       <td style={styles.td}>{b.id}</td>
                       <td style={styles.td}>{b.flightCode}</td>
-                      <td style={styles.td}>{b.departure}</td>
-                      <td style={styles.td}>{b.destination}</td>
-                      <td style={styles.td}>{b.departure_time ? new Date(b.departure_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>{b.arrival_time ? new Date(b.arrival_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{b.depart}</td>
+                      <td style={styles.td}>{b.arrive}</td>
+                      <td style={styles.td}>{b.depart_time ? new Date(b.depart_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{b.arrive_time ? new Date(b.arrive_time).toLocaleString() : '-'}</td>
                       <td style={styles.td}>{b.seat_number}</td>
                       <td style={styles.td}>{b.class}</td>
                       <td style={styles.td}>
@@ -282,17 +315,26 @@ export default function CustomerDashboard() {
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Make a Payment</h2>
           <div style={styles.grid}>
-            <input style={styles.input} placeholder="Booking ID" value={payForm.bookingId}
-              onChange={e => setPayForm({ ...payForm, bookingId: e.target.value })} />
-            <input style={styles.input} placeholder="Amount" value={payForm.amount}
-              onChange={e => setPayForm({ ...payForm, amount: e.target.value })} />
-            <select style={styles.input} value={payForm.method}
-              onChange={e => setPayForm({ ...payForm, method: e.target.value })}>
-              <option>Credit Card</option>
-              <option>Debit Card</option>
-              <option>Bank Transfer</option>
-              <option>Cash</option>
-            </select>
+            <div>
+              <label style={labelStyle}>Booking ID</label>
+              <input style={styles.input} placeholder="e.g. 1" value={payForm.bookingId}
+                onChange={e => setPayForm({ ...payForm, bookingId: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Amount ($)</label>
+              <input style={styles.input} placeholder="e.g. 150" value={payForm.amount}
+                onChange={e => setPayForm({ ...payForm, amount: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>Payment Method</label>
+              <select style={styles.input} value={payForm.method}
+                onChange={e => setPayForm({ ...payForm, method: e.target.value })}>
+                <option>Credit Card</option>
+                <option>Debit Card</option>
+                <option>Bank Transfer</option>
+                <option>Cash</option>
+              </select>
+            </div>
           </div>
           <button style={styles.primaryBtn} onClick={makePayment}>Pay Now</button>
 

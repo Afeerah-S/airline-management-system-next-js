@@ -25,6 +25,7 @@ export default function AdminDashboard() {
   const [crewForm, setCrewForm] = useState({ name: '', role: '', flight_id: '' });
   const [airportForm, setAirportForm] = useState({ code: '', name: '', city: '', country: '' });
   const [delayForm, setDelayForm] = useState({ flightCode: '', departure_time: '', arrival_time: '' });
+  const [assignForm, setAssignForm] = useState({ crew_id: '', flight_id: '' });
   const [cancelCode, setCancelCode] = useState('');
 
   useEffect(() => {
@@ -131,6 +132,23 @@ export default function AdminDashboard() {
       if (!res.ok) return notify('Error: ' + data.error);
       notify('Crew member added!');
       setCrewForm({ name: '', role: '', flight_id: '' });
+      fetchCrew();
+    } catch (e) { notify('Error: ' + e.message); }
+  };
+
+  const assignCrew = async () => {
+    if (!assignForm.crew_id) return notify('Please select a crew member');
+    if (!assignForm.flight_id) return notify('Please select a flight');
+    try {
+      const res = await fetch('/api/crew', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assignForm),
+      });
+      const data = await res.json();
+      if (!res.ok) return notify('Error: ' + data.error);
+      notify('Crew member assigned to flight!');
+      setAssignForm({ crew_id: '', flight_id: '' });
       fetchCrew();
     } catch (e) { notify('Error: ' + e.message); }
   };
@@ -291,18 +309,39 @@ export default function AdminDashboard() {
               <option>Engineer</option>
               <option>Ground Staff</option>
             </select>
-            <input style={styles.input} placeholder="Flight ID (optional)" value={crewForm.flight_id}
-              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })} />
+            <select style={styles.input} value={crewForm.flight_id}
+              onChange={e => setCrewForm({ ...crewForm, flight_id: e.target.value })}>
+              <option value="">Assign to Flight (optional)</option>
+              {flights.map(f => <option key={f.id} value={f.id}>{f.flightCode} — {f.departure} → {f.destination}</option>)}
+            </select>
           </div>
           <button style={styles.primaryBtn} onClick={addCrew}>Add Crew</button>
+
+          <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Assign Existing Crew to Flight</h2>
+          <p style={{ color: '#897D7B', fontSize: '14px', marginBottom: '16px' }}>Use this to assign a crew member who already exists to a different flight.</p>
+          <div style={styles.grid}>
+            <select style={styles.input} value={assignForm.crew_id}
+              onChange={e => setAssignForm({ ...assignForm, crew_id: e.target.value })}>
+              <option value="">Select Crew Member</option>
+              {crew.map(c => <option key={c.id} value={c.id}>{c.name} — {c.role}</option>)}
+            </select>
+            <select style={styles.input} value={assignForm.flight_id}
+              onChange={e => setAssignForm({ ...assignForm, flight_id: e.target.value })}>
+              <option value="">Select Flight</option>
+              {flights.map(f => <option key={f.id} value={f.id}>{f.flightCode} — {f.departure} → {f.destination}</option>)}
+            </select>
+          </div>
+          <button style={styles.primaryBtn} onClick={assignCrew}>Assign to Flight</button>
+
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Crew List</h2>
           {crew.length === 0 ? <p style={{ color: '#94a3b8', marginTop: '12px' }}>No crew members added yet.</p> : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
-                <thead><tr>{['Name', 'Role', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['ID', 'Name', 'Role', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {crew.map(c => (
                     <tr key={c.id}>
+                      <td style={styles.td}>{c.id}</td>
                       <td style={styles.td}>{c.name}</td>
                       <td style={styles.td}>{c.role}</td>
                       <td style={styles.td}>{c.status}</td>

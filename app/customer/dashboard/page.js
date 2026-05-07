@@ -46,18 +46,10 @@ export default function CustomerDashboard() {
   };
 
   const searchFlights = async () => {
-    if (searchMode === 'code' && !searchForm.flightCode.trim()) {
-      return notify('Please enter a flight code.');
-    }
-    if (searchMode === 'route' && !searchForm.departure) {
-      return notify('Please select a departure airport.');
-    }
-    if (searchMode === 'route' && !searchForm.destination) {
-      return notify('Please select a destination airport.');
-    }
-    if (searchMode === 'route' && searchForm.departure === searchForm.destination) {
-      return notify('Departure and destination cannot be the same.');
-    }
+    if (searchMode === 'code' && !searchForm.flightCode.trim()) return notify('Please enter a flight code.');
+    if (searchMode === 'route' && !searchForm.departure) return notify('Please select a departure airport.');
+    if (searchMode === 'route' && !searchForm.destination) return notify('Please select a destination airport.');
+    if (searchMode === 'route' && searchForm.departure === searchForm.destination) return notify('Departure and destination cannot be the same.');
     try {
       const params = new URLSearchParams(searchForm).toString();
       const res = await fetch(`/api/flights?${params}`);
@@ -110,6 +102,7 @@ export default function CustomerDashboard() {
     } catch (e) { notify('Error: ' + e.message); }
   };
 
+  // FIX 1: userId is now included in the payment body
   const makePayment = async () => {
     if (!payForm.bookingId.trim()) return notify('Please enter a booking ID.');
     if (!payForm.amount.trim() || isNaN(payForm.amount) || Number(payForm.amount) <= 0) return notify('Please enter a valid amount.');
@@ -117,9 +110,10 @@ export default function CustomerDashboard() {
       const res = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payForm),
+        body: JSON.stringify({ ...payForm, userId }),  // ← userId added here
       });
-      if (!res.ok) return notify('Payment failed. Check your booking ID.');
+      const data = await res.json();
+      if (!res.ok) return notify('Error: ' + data.error);
       notify('Payment successful!');
       setPayForm({ bookingId: '', amount: '', method: 'Credit Card' });
       fetchPayments(userId);
@@ -177,9 +171,7 @@ export default function CustomerDashboard() {
                 <select style={styles.input} value={searchForm.departure}
                   onChange={e => setSearchForm({ ...searchForm, departure: e.target.value })}>
                   <option value="">-- Select departure --</option>
-                  {airports.map(a => (
-                    <option key={a.id} value={a.code}>{a.code} — {a.city}</option>
-                  ))}
+                  {airports.map(a => <option key={a.id} value={a.code}>{a.code} — {a.city}</option>)}
                 </select>
               </div>
               <div>
@@ -277,6 +269,7 @@ export default function CustomerDashboard() {
           ) : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
+                {/* FIX 2: column headers match actual API response fields */}
                 <thead>
                   <tr>{['Booking ID', 'Flight', 'From', 'To', 'Departure', 'Arrival', 'Seat', 'Class', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr>
                 </thead>
@@ -285,10 +278,12 @@ export default function CustomerDashboard() {
                     <tr key={b.id}>
                       <td style={styles.td}>{b.id}</td>
                       <td style={styles.td}>{b.flightCode}</td>
-                      <td style={styles.td}>{b.depart}</td>
-                      <td style={styles.td}>{b.arrive}</td>
-                      <td style={styles.td}>{b.depart_time ? new Date(b.depart_time).toLocaleString() : '-'}</td>
-                      <td style={styles.td}>{b.arrive_time ? new Date(b.arrive_time).toLocaleString() : '-'}</td>
+                      {/* FIX 2: was b.depart / b.arrive — now correct field names from JOIN */}
+                      <td style={styles.td}>{b.departure}</td>
+                      <td style={styles.td}>{b.destination}</td>
+                      {/* FIX 2: was b.depart_time / b.arrive_time — now correct */}
+                      <td style={styles.td}>{b.departure_time ? new Date(b.departure_time).toLocaleString() : '-'}</td>
+                      <td style={styles.td}>{b.arrival_time ? new Date(b.arrival_time).toLocaleString() : '-'}</td>
                       <td style={styles.td}>{b.seat_number}</td>
                       <td style={styles.td}>{b.class}</td>
                       <td style={styles.td}>
@@ -321,7 +316,7 @@ export default function CustomerDashboard() {
                 onChange={e => setPayForm({ ...payForm, bookingId: e.target.value })} />
             </div>
             <div>
-              <label style={labelStyle}>Amount ($)</label>
+              <label style={labelStyle}>Amount (Rs)</label>
               <input style={styles.input} placeholder="e.g. 150" value={payForm.amount}
                 onChange={e => setPayForm({ ...payForm, amount: e.target.value })} />
             </div>
